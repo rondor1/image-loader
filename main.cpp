@@ -1,18 +1,29 @@
 #include <iostream>
 
+#include "Logger.hpp"
 #include "tgaImage/TGAImageLoad.hpp"
 
-int main(void)
+int main(int argc, char** argv)
 {
+
+    if(argc <= 1 || argv == nullptr)
+    {
+        std::cerr << "Invalid startup of application"<<std::endl;
+    }
+
+    utils::logger::setup(std::string_view{utils::constants::info});
+
+    utils::logger::infoMessage("Starting application...");
+
     auto loader = new imageloader::TGAImageLoader();
 
-    auto image = loader->loadImage("/home/robert/sample_640×426.tga");
+    auto image = loader->loadImage(std::string_view{argv[1]});
 
     if(std::holds_alternative<imageloader::TGAImage*>(image))
     {
         auto currentImage = std::get<imageloader::TGAImage*>(image);
 
-        loader->storeImage("sample_640×426.tga", *currentImage);
+        loader->storeImage(std::string_view{argv[2]}, *currentImage);
     }
 
 

@@ -27,6 +27,9 @@ namespace imageloader
             std::variant<std::string, ErrorCodes> storeImage(const std::string_view& imagePath, const TGAImage& image, const compressionStatus& status);
 
         private:
+            bool verifyDirectoryExistence(const std::string_view& imagePath);
+
+        private:
             std::unique_ptr<TGAImageLoaderImpl> d_ptr;
     };
 

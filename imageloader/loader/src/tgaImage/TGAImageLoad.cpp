@@ -105,6 +105,16 @@ namespace imageloader
         }
 
         private:
+<<<<<<< HEAD
+=======
+
+        std::vector<std::uint8_t> decompressRunLength(std::ifstream& inputFile, const TGAImage& image)
+        {
+            ///TODO: Handle RLE
+
+            return {};
+        }
+>>>>>>> store-image-location
     };
 
     TGAImageLoader::TGAImageLoader() : d_ptr{new TGAImageLoaderImpl}
@@ -124,10 +134,17 @@ namespace imageloader
 
     std::variant<std::string, ErrorCodes> TGAImageLoader::storeImage(const std::string_view& imagePath, const TGAImage& image)
     {
+<<<<<<< HEAD
         // if(!std::filesystem::exists(imagePath))
         // {
         //     return ErrorCodes::InvalidaPath;
         // }
+=======
+        if(!verifyDirectoryExistence(imagePath))
+        {
+            return ErrorCodes::InvalidaPath;
+        }
+>>>>>>> store-image-location
 
         return d_ptr->storeImage(imagePath, image);
     }
@@ -145,6 +162,18 @@ namespace imageloader
         return {};
     }
 
+<<<<<<< HEAD
+=======
+
+    bool TGAImageLoader::verifyDirectoryExistence(const std::string_view& imagePath)
+    {
+        //Start of the string + position where '/' is located
+        const auto directoryPath = imagePath.substr(0, imagePath.find_last_of('/') + 1);
+
+        return std::filesystem::exists( directoryPath) ? true : std::filesystem::create_directories(directoryPath);
+    }
+
+>>>>>>> store-image-location
     TGAImageLoader::~TGAImageLoader()
     {
         d_ptr.release();
