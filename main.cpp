@@ -1,7 +1,7 @@
 #include <iostream>
 
-#include "Logger.hpp"
 #include "tgaImage/TGAImageLoad.hpp"
+#include "Logger.hpp"
 
 int main(int argc, char** argv)
 {

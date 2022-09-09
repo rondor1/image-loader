@@ -60,7 +60,8 @@ namespace imageloader
                     header.imagetypecode == TYPE_FORMAT::COMPRESSED_BW)
             {
                 ///TODO: Handle uncompressing the data
-
+                auto tempData = decompressRunLength(inputFile, header);
+                auto data  = std::get<std::vector<uint8_t>>(tempData);
             }
 
             return new TGAImage{width, height, bpp, header, image};
@@ -106,11 +107,28 @@ namespace imageloader
 
         private:
 
-        std::vector<std::uint8_t> decompressRunLength(std::ifstream& inputFile, const TGAImage& image)
+        std::variant<std::vector<std::uint8_t>, ErrorCodes> decompressRunLength(std::ifstream& inputFile, const TGAHeader& header)
         {
-            ///TODO: Handle RLE
+            const size_t pixelCount = header.width*header.height;
+            size_t currentPixel = 0;
+            size_t currentByte = 0;
+            size_t bufferSize = pixelCount* (header.bitsperpixel >> 3);
+            auto bytesPerPixelRLE = (header.bitsperpixel >>3)+1;
+            auto data = std::vector<std::uint8_t>(bufferSize,0);
+            data.reserve(bufferSize);
+            auto tempData = std::vector<std::uint8_t>(bufferSize,0);
 
-            return {};
+            inputFile.read(reinterpret_cast<char*>(&tempData), bufferSize);
+
+            for(auto i = 0; i < bufferSize; ++i)
+            {
+                auto runCount = (127 & tempData[i]) +1;
+
+
+            }
+
+
+            return data;
         }
     };
 
