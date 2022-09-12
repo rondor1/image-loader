@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <optional>
 
 namespace imageloader
 {
@@ -14,6 +15,10 @@ namespace imageloader
         COMPRESSED_RGB = 10,
         COMPRESSED_BW = 11
     };
+
+    constexpr auto maxChunkLength = 128;
+    constexpr auto maxDataLenghtRLE = 127;
+    constexpr auto runLengthMask = 0x80;
 
     class TGAImageLoaderImpl
     {
@@ -59,9 +64,13 @@ namespace imageloader
             else if(header.imagetypecode == TYPE_FORMAT::COMPRESSED_RGB ||
                     header.imagetypecode == TYPE_FORMAT::COMPRESSED_BW)
             {
-                ///TODO: Handle uncompressing the data
-                auto tempData = decompressRunLength(inputFile, header);
-                auto data  = std::get<std::vector<uint8_t>>(tempData);
+                auto result = decompressRunLength(inputFile, header);
+                if(std::holds_alternative<ErrorCodes>(result))
+                {
+                    return std::get<ErrorCodes>(result);
+                }
+
+                image = std::get<std::vector<std::uint8_t>>(result);
             }
 
             return new TGAImage{width, height, bpp, header, image};
@@ -105,31 +114,172 @@ namespace imageloader
             return std::string{imagePath};
         }
 
-        private:
-
-        std::variant<std::vector<std::uint8_t>, ErrorCodes> decompressRunLength(std::ifstream& inputFile, const TGAHeader& header)
+        std::variant<std::string, ErrorCodes> storeCompressedImage(const std::string_view& imagePath, const TGAImage& image)
         {
-            const size_t pixelCount = header.width*header.height;
-            size_t currentPixel = 0;
-            size_t currentByte = 0;
-            size_t bufferSize = pixelCount* (header.bitsperpixel >> 3);
-            auto bytesPerPixelRLE = (header.bitsperpixel >>3)+1;
-            auto data = std::vector<std::uint8_t>(bufferSize,0);
-            data.reserve(bufferSize);
-            auto tempData = std::vector<std::uint8_t>(bufferSize,0);
-
-            inputFile.read(reinterpret_cast<char*>(&tempData), bufferSize);
-
-            for(auto i = 0; i < bufferSize; ++i)
+            std::ofstream outputFile(imagePath.data(), std::ios::binary | std::ios::out);
+            if(!outputFile.is_open())
             {
-                auto runCount = (127 & tempData[i]) +1;
-
-
+                return ErrorCodes::UnableToOpenImage;
             }
 
+            auto header = image.getHeader();
+            outputFile.write(reinterpret_cast<char*>(&header), sizeof(header));
+            if(!outputFile.good())
+            {
+                return ErrorCodes::InvalidWriteOperation;
+            }
 
-            return data;
+            auto result = compressRunLength(outputFile, image.data(), header);
+            if(!result.has_value())
+            {
+                return std::string{imagePath.data()};
+            }
+
+            return result.value();
         }
+
+        private:
+
+            std::variant<std::vector<std::uint8_t>, ErrorCodes> decompressRunLength(std::ifstream& inputFile, const TGAHeader& header)
+            {
+                const auto pixelCount = header.width*header.height;
+                auto currentPixel = 0;
+                auto currentByte = 0;
+                const auto bytesPerPixel = header.bitsperpixel>>3;
+                TGAColor color;
+
+                std::vector<std::uint8_t> data(pixelCount*bytesPerPixel, 0);
+
+                while(currentPixel < pixelCount)
+                {
+                    auto chunkHeader = static_cast<std::uint8_t>(inputFile.get());
+
+                    if(!inputFile.good())
+                    {
+                        return ErrorCodes::InvalidReadOperation;
+                    }
+
+                    //Check if chunk is RAW
+                    if(!(chunkHeader & runLengthMask))
+                    {
+                        ++chunkHeader;
+                        for(auto iter = 0; iter < chunkHeader; ++iter)
+                        {
+                            inputFile.read(reinterpret_cast<char*>(&color), (header.bitsperpixel>>3));
+                            if(!inputFile.good())
+                            {
+                                return ErrorCodes::InvalidReadOperation;
+                            }
+
+                            for(auto i = 0; i < bytesPerPixel; ++i)
+                            {
+                                data[currentByte++] = color.bgra[i];
+                            }
+                            ++currentPixel;
+
+                            if(currentPixel > pixelCount)
+                            {
+                                return ErrorCodes::InvalidReadOperation;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        //Handle RLE data
+                        chunkHeader -= maxDataLenghtRLE;
+                        inputFile.read(reinterpret_cast<char*>(&color.bgra), bytesPerPixel);
+                        if(!inputFile.good())
+                        {
+                            return ErrorCodes::InvalidReadOperation;
+                        }
+
+                        for(auto i = 0; i < chunkHeader; ++i)
+                        {
+                            for(auto j = 0; j < bytesPerPixel; ++j)
+                            {
+                                data[currentByte++] = color.bgra[j];
+                            }
+                            ++currentPixel;
+
+                            if(currentPixel > pixelCount)
+                            {
+                                return ErrorCodes::InvalidReadOperation;
+                            }
+                        }
+                    }
+                }
+
+                return data;
+            }
+
+            std::optional<ErrorCodes> compressRunLength(std::ofstream& outputFile, std::uint8_t* data, const TGAHeader& header)
+            {
+
+                if(data == nullptr)
+                {
+                    return ErrorCodes::InvalidWriteOperation;
+                }
+
+                const auto pixelCount = header.width*header.height;
+                const auto bytesPerPixel = header.bitsperpixel >> 3;
+                auto currentPixel = 0;
+                bool isChunkRaw = true;
+
+                while(currentPixel < pixelCount)
+                {
+                    auto runLengthNumber = 1;
+                    auto currentByte = currentPixel*bytesPerPixel;
+                    auto chunkStart = currentPixel*bytesPerPixel;
+
+                    while(currentPixel + runLengthNumber < pixelCount && runLengthNumber < maxChunkLength)
+                    {
+                        bool isSuccessorEqual = true;
+                        for(auto iter = 0; isSuccessorEqual && iter < bytesPerPixel; ++iter)
+                        {
+                            isSuccessorEqual = data[currentByte+iter] == data[currentByte+bytesPerPixel+iter];
+                        }
+                        currentByte += bytesPerPixel;
+                        if(runLengthNumber == 1)
+                        {
+                            // If chunk is RAw, further checks will terminate the loop, this one just sets the RAW flag to proper state
+                            isChunkRaw = !isSuccessorEqual;
+                        }
+
+                        //Handle first occurence of a similar chunk, while RAW data is being processed
+                        if(isChunkRaw && isSuccessorEqual)
+                        {
+                            --runLengthNumber;
+                            break;
+                        }
+
+                        if(!isChunkRaw && !isSuccessorEqual)
+                        {
+                            break;
+                        }
+
+                        ++runLengthNumber;
+                    }
+
+                    currentPixel += runLengthNumber;
+
+                    const auto chunkStatusValue = isChunkRaw ? runLengthNumber-1 : runLengthNumber + maxDataLenghtRLE;
+                    outputFile.put(chunkStatusValue);
+                    if(!outputFile.good())
+                    {
+                        return ErrorCodes::InvalidWriteOperation;
+                    }
+
+                    //In case of a RAW data, write bigger chunk, as size number of raw chunks * bytesPerPixel
+                    const auto dataToBeWriten = isChunkRaw ? runLengthNumber*bytesPerPixel : bytesPerPixel;
+                    outputFile.write(reinterpret_cast<char*>(data+chunkStart), dataToBeWriten);
+                    if(!outputFile.good())
+                    {
+                        return ErrorCodes::InvalidWriteOperation;
+                    }
+                }
+
+                return std::nullopt;
+            }
     };
 
     TGAImageLoader::TGAImageLoader() : d_ptr{new TGAImageLoaderImpl}
@@ -141,7 +291,7 @@ namespace imageloader
     {
         if(!std::filesystem::exists(imagePath))
         {
-            return ErrorCodes::InvalidaPath;
+            return ErrorCodes::InvalidPath;
         }
 
         return d_ptr->loadImage(imagePath);
@@ -151,7 +301,7 @@ namespace imageloader
     {
         if(!verifyDirectoryExistence(imagePath))
         {
-            return ErrorCodes::InvalidaPath;
+            return ErrorCodes::InvalidPath;
         }
 
         return d_ptr->storeImage(imagePath, image);
@@ -160,14 +310,17 @@ namespace imageloader
     std::variant<std::string, ErrorCodes> TGAImageLoader::storeImage(const std::string_view& imagePath, const TGAImage& image,
                                                                       const compressionStatus& status)
     {
+        if(!verifyDirectoryExistence(imagePath))
+        {
+            return ErrorCodes::InvalidPath;
+        }
+
         if(compressionStatus::NO == status)
         {
             return storeImage(imagePath, image);
         }
 
-        ///TODO: Handle missing RLE
-
-        return {};
+        return d_ptr->storeCompressedImage(imagePath, image);
     }
 
 
