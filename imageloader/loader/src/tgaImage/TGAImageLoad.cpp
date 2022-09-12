@@ -4,6 +4,8 @@
 #include <filesystem>
 #include <fstream>
 
+#include <iostream>
+
 namespace imageloader
 {
 
@@ -61,7 +63,7 @@ namespace imageloader
             {
                 ///TODO: Handle uncompressing the data
                 auto tempData = decompressRunLength(inputFile, header);
-                auto data  = std::get<std::vector<uint8_t>>(tempData);
+                image = std::get<std::vector<uint8_t>>(tempData);
             }
 
             return new TGAImage{width, height, bpp, header, image};
@@ -109,24 +111,70 @@ namespace imageloader
 
         std::variant<std::vector<std::uint8_t>, ErrorCodes> decompressRunLength(std::ifstream& inputFile, const TGAHeader& header)
         {
-            const size_t pixelCount = header.width*header.height;
-            size_t currentPixel = 0;
-            size_t currentByte = 0;
-            size_t bufferSize = pixelCount* (header.bitsperpixel >> 3);
-            auto bytesPerPixelRLE = (header.bitsperpixel >>3)+1;
-            auto data = std::vector<std::uint8_t>(bufferSize,0);
-            data.reserve(bufferSize);
-            auto tempData = std::vector<std::uint8_t>(bufferSize,0);
+            const auto pixelCount = header.width*header.height;
+            auto currentPixel = 0;
+            auto currentByte = 0;
+            const auto bytesPerPixel = header.bitsperpixel>>3;
+            TGAColor color;
 
-            inputFile.read(reinterpret_cast<char*>(&tempData), bufferSize);
+            std::vector<std::uint8_t> data(pixelCount*bytesPerPixel, 0);
 
-            for(auto i = 0; i < bufferSize; ++i)
+            while(currentPixel < pixelCount)
             {
-                auto runCount = (127 & tempData[i]) +1;
+                auto chunkHeader = static_cast<std::uint8_t>(inputFile.get());
 
+                if(!inputFile.good())
+                {
+                    return ErrorCodes::InvalidReadOperation;
+                }
 
+                if(!(chunkHeader & 0x80))
+                {
+                    ++chunkHeader;
+                    for(auto iter = 0; iter < chunkHeader; ++iter)
+                    {
+                        inputFile.read(reinterpret_cast<char*>(&color), (header.bitsperpixel>>3));
+                        if(!inputFile.good())
+                        {
+                            return ErrorCodes::InvalidReadOperation;
+                        }
+
+                        for(auto i = 0; i < bytesPerPixel; ++i)
+                        {
+                            data[currentByte++] = color.bgra[1];
+                        }
+                        ++currentPixel;
+
+                        if(currentPixel > pixelCount)
+                        {
+                            return ErrorCodes::InvalidReadOperation;
+                        }
+                    }
+                }
+                else
+                {
+                    chunkHeader -= 127;
+                    inputFile.read(reinterpret_cast<char*>(&color.bgra), bytesPerPixel);
+                    if(!inputFile.good())
+                    {
+                        return ErrorCodes::InvalidReadOperation;
+                    }
+
+                    for(auto i = 0; i < chunkHeader; ++i)
+                    {
+                        for(auto j = 0; j < bytesPerPixel; ++j)
+                        {
+                            data[currentByte++] = color.bgra[j];
+                        }
+                        ++currentPixel;
+
+                        if(currentPixel > pixelCount)
+                        {
+                            return ErrorCodes::InvalidReadOperation;
+                        }
+                    }
+                }
             }
-
 
             return data;
         }
@@ -166,6 +214,46 @@ namespace imageloader
         }
 
         ///TODO: Handle missing RLE
+        std::ofstream out = std::ofstream(imagePath.data(), std::ios::out | std::ios::binary);
+        auto header = image.getHeader();
+        out.write(reinterpret_cast<char*>(&header), sizeof(header));
+        const std::uint8_t max_chunk_length = 128;
+        size_t npixels = image.getHeader().height*image.getHeader().width;
+        size_t curpix = 0;
+        auto bpp = image.bitsPerPixel();
+        auto data = image.data();
+        while (curpix<npixels) {
+            size_t chunkstart = curpix*bpp;
+            size_t curbyte = curpix*bpp;
+            std::uint8_t run_length = 1;
+            bool raw = true;
+            while (curpix+run_length<npixels && run_length<max_chunk_length) {
+                bool succ_eq = true;
+                for (int t=0; succ_eq && t<bpp; t++)
+                    succ_eq = (data[curbyte+t]==data[curbyte+t+bpp]);
+                curbyte += bpp;
+                if (1==run_length)
+                    raw = !succ_eq;
+                if (raw && succ_eq) {
+                    run_length--;
+                    break;
+                }
+                if (!raw && !succ_eq)
+                    break;
+                run_length++;
+            }
+            curpix += run_length;
+            out.put(raw?run_length-1:run_length+127);
+            if (!out.good()) {
+                std::cerr << "can't dump the tga file\n";
+                return ErrorCodes::InvalidWriteOperation;
+            }
+            out.write(reinterpret_cast<const char *>(data+chunkstart), (raw?run_length*bpp:bpp));
+            if (!out.good()) {
+                std::cerr << "can't dump the tga file\n";
+                return ErrorCodes::InvalidWriteOperation;
+            }
+        }
 
         return {};
     }

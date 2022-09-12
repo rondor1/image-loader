@@ -79,6 +79,15 @@ std::uint8_t& TGAColor::operator[](const int& index)
         return d_ptr->height;
     }
 
+    TGAImage& TGAImage::operator=(const TGAImage& image)
+    {
+        if(&image == this)
+            return *this;
+
+        this->d_ptr.reset(image.d_ptr.get());
+
+        return *this;
+    }
 
     int TGAImage::bitsPerPixel() const
     {
