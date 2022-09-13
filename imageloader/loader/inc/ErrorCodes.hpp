@@ -7,7 +7,7 @@ namespace imageloader
     enum class [[nodiscard]] ErrorCodes
     {
         IndexOutOfRange,
-        InvalidaPath,
+        InvalidPath,
         UnableToOpenImage,
         InvalidReadOperation,
         InvalidWriteOperation

@@ -55,6 +55,8 @@ namespace imageloader
             ~TGAImage();
             TGAImage(const TGAImage& rhs);
 
+            TGAImage& operator=(const TGAImage& image);
+
             int width() const;
             int height() const;
             int bitsPerPixel() const;

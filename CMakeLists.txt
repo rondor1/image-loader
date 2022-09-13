@@ -5,7 +5,9 @@ project(image-loader VERSION 0.0.1
 include(cmake/setup.cmake)
 include(cmake/conan.cmake)
 
+add_subdirectory(utils)
 add_subdirectory(imageloader)
 
 add_executable(${PROJECT_NAME} main.cpp)
-target_link_libraries(${PROJECT_NAME} ${PROJECT_NAME}::loader)
+target_link_libraries(${PROJECT_NAME} ${PROJECT_NAME}::loader
+                                      ${PROJECT_NAME}::utils)
