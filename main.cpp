@@ -1,7 +1,7 @@
 #include <iostream>
 
-#include "Logger.hpp"
 #include "tgaImage/TGAImageLoad.hpp"
+#include "Logger.hpp"
 
 int main(int argc, char** argv)
 {
@@ -23,7 +23,7 @@ int main(int argc, char** argv)
     {
         auto currentImage = std::get<imageloader::TGAImage*>(image);
 
-        loader->storeImage(std::string_view{argv[2]}, *currentImage);
+        loader->storeImage(std::string_view{argv[2]}, *currentImage, imageloader::compressionStatus::YES);
     }
 
 
