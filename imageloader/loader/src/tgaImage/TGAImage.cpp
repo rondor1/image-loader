@@ -74,6 +74,11 @@ std::uint8_t& TGAColor::operator[](const int& index)
         d_ptr.reset(rhs.d_ptr.get());
     }
 
+    TGAImage::TGAImage(TGAImage&& rhs)
+    {
+        d_ptr.reset(rhs.d_ptr.get());
+    }
+
     int TGAImage::width() const
     {
         return d_ptr->width;
@@ -135,9 +140,9 @@ std::uint8_t& TGAColor::operator[](const int& index)
 
     TGAImage::~TGAImage()
     {
-        d_ptr.release();
-        d_ptr.reset(nullptr);
+
     }
+
     void TGAImage::setHeader(const TGAHeader&& header)
     {
         d_ptr->header = header;
