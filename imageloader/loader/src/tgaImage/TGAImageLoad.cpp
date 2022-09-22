@@ -334,7 +334,6 @@ namespace imageloader
 
     TGAImageLoader::~TGAImageLoader()
     {
-        d_ptr.release();
-        d_ptr.reset(nullptr);
+
     }
 } // namespace imageloader

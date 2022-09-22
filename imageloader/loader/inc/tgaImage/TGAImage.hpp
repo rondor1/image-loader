@@ -54,6 +54,7 @@ namespace imageloader
             TGAImage(const int& width, const int& height, const int& bpp, const TGAHeader& header,const std::vector<std::uint8_t>& imageData);
             ~TGAImage();
             TGAImage(const TGAImage& rhs);
+            TGAImage(TGAImage&& rhs);
 
             TGAImage& operator=(const TGAImage& image);
 
