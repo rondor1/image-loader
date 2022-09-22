@@ -6,6 +6,6 @@ endif()
 
 include(${CMAKE_BINARY_DIR}/conan.cmake)
 
-conan_cmake_run(CONANFILE ${CMAKE_SOURCE_DIR}/conanfile.txt
+conan_cmake_run(CONANFILE ${CMAKE_CURRENT_SOURCE_DIR}/conanfile.txt
                 BASIC_SETUP CMAKE_TARGETS
                 BUILD missing)
