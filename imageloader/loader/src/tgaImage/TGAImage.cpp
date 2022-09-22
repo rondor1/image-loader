@@ -60,6 +60,21 @@ std::uint8_t& TGAColor::operator[](const int& index)
 
     }
 
+    TGAImage::TGAImage(const int& width, const int& height, const Format& format, bool rle): d_ptr{new TGAImageImpl}
+    {
+        d_ptr->width = width;
+        d_ptr->height = height;
+        d_ptr->bpp = format;
+        d_ptr->header.bitsperpixel = format << 3;
+        d_ptr->header.height = height;
+        d_ptr->header.width = width;
+        d_ptr->header.xorigin = 0;
+        d_ptr->header.yorigin = 0;
+        d_ptr->image.reserve(width*height*format);
+        d_ptr->image.assign(width*height*format, 0);
+        d_ptr->header.imagetypecode = (format == Format::GRAYSCALE ? (rle? 11:3) : (rle? 10:2));
+    }
+
     TGAImage::TGAImage(const int& width, const int& height, const int& bpp, const TGAHeader& header,const std::vector<std::uint8_t>& imageData) : d_ptr{new TGAImageImpl}
     {
         d_ptr->width = width;

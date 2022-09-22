@@ -47,10 +47,19 @@ namespace imageloader
 
     class TGAImageImpl;
 
+
+    enum Format : std::uint8_t
+    {
+        GRAYSCALE = 1,
+        RGB = 3,
+        RGBA = 4
+    };
+
     class TGAImage
     {
         public:
             TGAImage();
+            TGAImage(const int& width, const int& height, const Format& format, bool rle);
             TGAImage(const int& width, const int& height, const int& bpp, const TGAHeader& header,const std::vector<std::uint8_t>& imageData);
             ~TGAImage();
             TGAImage(const TGAImage& rhs);
