@@ -7,15 +7,6 @@
 
 namespace imageloader
 {
-
-    enum TYPE_FORMAT : std::uint8_t
-    {
-        UNCOMPRESSED_RGB = 2,
-        UNCOMPRESSED_BW = 3,
-        COMPRESSED_RGB = 10,
-        COMPRESSED_BW = 11
-    };
-
     constexpr auto maxChunkLength = 128;
     constexpr auto maxDataLenghtRLE = 127;
     constexpr auto runLengthMask = 0x80;
