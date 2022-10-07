@@ -44,7 +44,8 @@ int main(int argc, char** argv)
             utils::logger::infoMessage("Image successfully created!");
         }
 
-        auto result = imagePointer->storeImage(argv[2], *(image.get()));
+        auto path = std::string_view{argv[2]};
+        auto result = imagePointer->storeImage(path, *(image.get()));
 
         if(std::holds_alternative<imageloader::ErrorCodes>(result))
         {
