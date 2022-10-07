@@ -5,11 +5,15 @@
 #include <fstream>
 #include <optional>
 
+#include <iostream>
+
 namespace imageloader
 {
     constexpr auto maxChunkLength = 128;
     constexpr auto maxDataLenghtRLE = 127;
     constexpr auto runLengthMask = 0x80;
+
+    constexpr auto outputDirectory = "/outputs/";
 
     class TGAImageLoaderImpl
     {
@@ -288,39 +292,57 @@ namespace imageloader
         return d_ptr->loadImage(imagePath);
     }
 
-    std::variant<std::string, ErrorCodes> TGAImageLoader::storeImage(const std::string_view& imagePath, const TGAImage& image)
+    std::variant<std::string, ErrorCodes> TGAImageLoader::storeImage(std::string_view& imagePath, const TGAImage& image)
     {
-        if(!verifyDirectoryExistence(imagePath))
+        std::string outputPath(imagePath);
+        if(!verifyDirectoryExistence(outputPath))
         {
             return ErrorCodes::InvalidPath;
         }
 
-        return d_ptr->storeImage(imagePath, image);
+        return d_ptr->storeImage(outputPath, image);
     }
 
-    std::variant<std::string, ErrorCodes> TGAImageLoader::storeImage(const std::string_view& imagePath, const TGAImage& image,
+    std::variant<std::string, ErrorCodes> TGAImageLoader::storeImage(std::string_view& imagePath, const TGAImage& image,
                                                                       const compressionStatus& status)
     {
-        if(!verifyDirectoryExistence(imagePath))
-        {
-            return ErrorCodes::InvalidPath;
-        }
 
         if(compressionStatus::NO == status)
         {
             return storeImage(imagePath, image);
         }
 
-        return d_ptr->storeCompressedImage(imagePath, image);
+        std::string outputPath{imagePath};
+        if(!verifyDirectoryExistence(outputPath))
+        {
+            return ErrorCodes::InvalidPath;
+        }
+
+        return d_ptr->storeCompressedImage(outputPath, image);
     }
 
 
-    bool TGAImageLoader::verifyDirectoryExistence(const std::string_view& imagePath)
+    bool TGAImageLoader::verifyDirectoryExistence(std::string& imagePath)
     {
-        //Start of the string + position where '/' is located
-        const auto directoryPath = imagePath.substr(0, imagePath.find_last_of('/') + 1);
+        const auto path = std::filesystem::path(imagePath);
+        if(!path.has_filename())
+        {
+            return false;
+        }
 
-        return std::filesystem::exists( directoryPath) ? true : std::filesystem::create_directories(directoryPath);
+        std::string fullPath{imagePath};
+
+        if(path.is_relative())
+        {
+            //Start of the string + position where '/' is located
+            std::string currentPath = std::filesystem::current_path().c_str();
+            currentPath += outputDirectory + fullPath;
+            std::swap(fullPath, currentPath);
+        }
+
+        const auto outputDirectoryPath = fullPath.substr(0, fullPath.find_last_of('/') + 1);
+        imagePath = fullPath;
+        return std::filesystem::exists( outputDirectoryPath) ? true : std::filesystem::create_directories(outputDirectoryPath);
     }
 
     TGAImageLoader::~TGAImageLoader()
